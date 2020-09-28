@@ -66,6 +66,7 @@ set (PKG_REQUIRED_LIST
 	json-c>=0.12
 	afb-daemon
 	afb-helpers
+	libudev
 )
 
 # You can also consider to include libsystemd
