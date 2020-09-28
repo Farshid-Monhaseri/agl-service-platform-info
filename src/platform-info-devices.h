@@ -45,6 +45,7 @@ typedef struct {
 
 
 int                 pinfo_device_monitor(afb_req_t req);
+json_object*        pinfo_device_scan(json_object *jfilter, json_object* jmask);
 
 static void*        pinfo_device_client_new(void* req_ctx);
 static void         pinfo_device_client_free(void* client_ctx);
@@ -53,6 +54,8 @@ static void         pinfo_device_monitor_detect(pinfo_client_ctx_t* ctx, json_ob
 static json_object* pinfo_device_udevice_to_jdevice(struct udev_device* udevice, json_object* jmask);
 static void         pinfo_device_jdev_destructor(json_object* jdevice, void* udevice);
 int                 pinfo_device_filter_monitoring(pinfo_client_ctx_t* ctx);
+static void         pinfo_device_filter_scan(struct udev_enumerate* udev_enum, json_object* jfilter);
+
 static json_object* pinfo_device_udevice_to_jlist(
                                     struct udev_device* udevice,
                                     struct udev_list_entry*(*udevice_elist)(struct udev_device*),

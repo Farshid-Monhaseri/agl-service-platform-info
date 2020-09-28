@@ -352,3 +352,96 @@ pinfo_device_monitor_loop(pinfo_client_ctx_t* ctx) {
         }
     }
 }
+
+static void
+pinfo_device_filter_scan(struct udev_enumerate* udev_enum, json_object* jfilter) {
+    if(udev_enum && jfilter) {
+        if(json_object_is_type(jfilter,json_type_object)) {
+            json_object* jval = NULL;
+
+			if(json_object_object_get_ex(jfilter,"tags",&jval)) {
+				if(json_object_is_type(jval,json_type_array)) {
+					int tag_idx = 0;
+					const char* tag_str = NULL;
+					const int tags_count = json_object_array_length(jval);
+
+					if(tags_count > 0) {
+                        json_object* jtag = NULL;
+
+                        for(jtag = json_object_array_get_idx(jval,0);
+                            jtag && tag_idx < tags_count;
+                            jtag = json_object_array_get_idx(jtag,++tag_idx)) {
+                            udev_enumerate_add_match_tag(udev_enum,json_object_get_string(jtag));
+                        }
+					} else {
+						//Empty json array for tags array
+					}
+				} else if(json_object_is_type(jval,json_type_string)) {
+					udev_enumerate_add_match_tag(udev_enum,json_object_get_string(jval));
+				} else {
+					//Unsupported type
+				}
+			}
+
+			if(json_object_object_get_ex(jfilter,"properties",&jval) &&
+            json_object_is_type(jval,json_type_object)) {
+                if(json_object_object_length(jval) > 0) {
+                    json_object_object_foreach(jval,key,value) {
+                        udev_enumerate_add_match_property(udev_enum,key,json_object_get_string(value));
+                    }
+                }
+			}
+
+			if(json_object_object_get_ex(jfilter,"attributes",&jval) &&
+            json_object_is_type(jval,json_type_object)) {
+                if(json_object_object_length(jval) > 0) {
+                    json_object_object_foreach(jval,key,value) {
+                        udev_enumerate_add_match_sysattr(udev_enum,key,json_object_get_string(value));
+                    }
+                }
+			}
+        }
+    }
+}
+
+json_object*
+pinfo_device_scan(json_object *jfilter, json_object* jmask) {
+    json_object* jdevs_arr = NULL;
+    struct udev* udev_ctx = NULL;
+
+    udev_ctx = udev_new();
+    jdevs_arr = json_object_new_array();
+
+    if(udev_ctx) {
+        struct udev_enumerate *dev_enum = NULL;
+
+        dev_enum = udev_enumerate_new(udev_ctx);
+        if(dev_enum) {
+            struct udev_list_entry *dev_elist = NULL;
+            struct udev_list_entry *dev_elist_head = NULL;
+            pinfo_device_filter_scan(dev_enum,jfilter);
+
+
+            udev_enumerate_scan_devices(dev_enum);
+            dev_elist = udev_enumerate_get_list_entry(dev_enum);
+            if(dev_elist) {
+                udev_list_entry_foreach(dev_elist_head,dev_elist) {
+                    struct udev_device *udevice = NULL;
+                    json_object *jdevice = NULL;
+                    const char* path = udev_list_entry_get_name(dev_elist_head);
+
+                    udevice = udev_device_new_from_syspath((struct udev*)udev_ctx,path);
+                    jdevice = pinfo_device_udevice_to_jdevice(udevice,jmask);
+                    if(jdevice) {
+                        json_object_array_add(jdevs_arr,jdevice);
+                    } else {
+                        udev_device_unref(udevice);
+                    }
+                }
+            }
+        }
+        udev_enumerate_unref(dev_enum);
+    }
+
+    return jdevs_arr;
+}

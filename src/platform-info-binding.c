@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2019 "IoT.bzh"
+ * Copyright (C) 2016-2020 "IoT.bzh"
  *
  * Author "Romain Forlot" <romain.forlot@iot.bzh>
  *
@@ -132,7 +132,7 @@ void afv_subscribe(afb_req_t req) {
 }
 
 static json_object*
-pinfo_afb_static_info(const char* dir) {
+afv_static_info(const char* dir) {
 	struct dirent* dir_ent = NULL;
 	DIR* dir_handle = opendir(dir);
 	json_object* static_info = NULL;
@@ -176,6 +176,26 @@ pinfo_afb_static_info(const char* dir) {
 	return static_info;
 }
 
+void afv_scan(afb_req_t req) {
+	json_object* jres = NULL;
+	json_object* jfilter = NULL;
+	json_object* jmask = NULL;
+	json_object* jargs = afb_req_json(req);
+
+	if(json_object_is_type(jargs,json_type_object)) {
+		json_object_object_get_ex(jargs,"filter",&jfilter);
+		json_object_object_get_ex(jargs,"mask",&jmask);
+	}
+
+	jres = pinfo_device_scan(jfilter,jmask);
+
+	if(jres) {
+		afb_req_success(req,jres,"Scan success");
+	} else {
+		afb_req_fail(req,"failed","Scan failed");
+	}
+}
+
 int init(afb_api_t api) {
 	// Initializing the platform_info binding object and associated it to
 	// the api
@@ -184,16 +204,15 @@ int init(afb_api_t api) {
 
     api_ctx = malloc(sizeof(*api_ctx));
 	if(api_ctx) {
-		api_ctx->info = pinfo_afb_static_info(PLATFORM_INFO_DIR);
-		if(api_ctx->info) {
-			AFB_DEBUG("The API static data: %s",
-				json_object_to_json_string_ext(api_ctx->info, JSON_C_TO_STRING_PRETTY));
-			api_ctx->client_count = 0;
-			afb_api_set_userdata(api, (void*)api_ctx);
-		} else {
-			AFB_WARNING("Failed to load the static data");
-			ret = PINFO_ERR;
-		}
+		api_ctx->info = afv_static_info(PLATFORM_INFO_DIR);
+		AFB_API_DEBUG(api,"The API static data: %s",
+			json_object_to_json_string_ext(api_ctx->info, JSON_C_TO_STRING_PRETTY));
+		api_ctx->client_count = 0;
+		afb_api_set_userdata(api, (void*)api_ctx);
+	} else {
+		AFB_API_WARNING(api,"Failed to load the static data");
+		ret = PINFO_ERR;
 	}
+
 	return ret;
 }
